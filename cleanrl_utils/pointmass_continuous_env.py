@@ -184,7 +184,7 @@ class PointMassContinuousEnv(gym.Env):
             velocity = velocity / velocity_norm * self.max_velocity
 
         # Calculate new position
-        new_pos = self._agent_pos + velocity * 0.1  # Small time step
+        new_pos = self._agent_pos + velocity * 0.3  # Small time step
 
         reward = 0.0
         terminated = False
@@ -203,6 +203,7 @@ class PointMassContinuousEnv(gym.Env):
         distance_to_goal = np.linalg.norm(self._agent_pos - self._goal_pos)
         if distance_to_goal < self.goal_radius:
             self._actual_performance += 1
+            terminated = True
 
         # Check time limit
         if self._steps >= self.max_steps:
@@ -293,7 +294,7 @@ def make_env(
     agent_radius: float = 0.2,
     goal_radius: float = 0.3,
     max_velocity: float = 2.0,
-    max_episode_steps: int = 500,
+    max_episode_steps: int = 5000,
     seed: Optional[int] = None,
     render_mode: Optional[str] = None,
 ) -> PointMassContinuousEnv:
