@@ -24,10 +24,9 @@ class PointMassDiscreteEnv(PointMassContinuousEnv):
 
     def __init__(self, seed: Optional[int] = None, render_mode: Optional[str] = None):
         super().__init__()
-
         # TODO: Decide how many discrete actions you need.
         # Action space: some number of discrete actions
-        self.action_space = spaces.Discrete(5)
+        self.action_space = spaces.Discrete(9)
 
         # Initialize with random positions
         self._reset_positions()
@@ -40,6 +39,10 @@ class PointMassDiscreteEnv(PointMassContinuousEnv):
             2: (np.array([ 0.0,  self.max_velocity]), "up"),  # Up
             3: (np.array([ 0.0, -self.max_velocity]), "down"),  # Down
             4: (np.array([ 0.0,  0.0]), "no-op"),  # No-op
+            5: (np.array([ self.max_velocity,  self.max_velocity]), "right-up"),  # Right-up
+            6: (np.array([ self.max_velocity, -self.max_velocity]), "right-down"),  # Right-down
+            7: (np.array([-self.max_velocity,  self.max_velocity]), "left-up"),  # Left-up
+            8: (np.array([-self.max_velocity, -self.max_velocity]), "left-down"),  # Left-down
         }
 
         # TODO: TURN DISCRETE ACTIONS INTO A CONTINUOUS ONE.
@@ -51,30 +54,30 @@ class PointMassDiscreteEnv(PointMassContinuousEnv):
         prev_distance = np.linalg.norm(self._agent_pos - self._goal_pos)
         steps = self._steps
 
-        if steps % 100 == 0:
-            print(f"DEBUG: Before step - Agent pos: {self._agent_pos}, move: {action_to_control[action][1]}, goal pos: {self._goal_pos}, distance: {prev_distance}")
+        # if steps % 100 == 0:
+        #     print(f"DEBUG: Before step - Agent pos: {self._agent_pos}, move: {action_to_control[action][1]}, goal pos: {self._goal_pos}, distance: {prev_distance}")
 
         _, _, terminated, truncated, info = super().step(control)
         observation = self._get_obs()
         new_distance = np.linalg.norm(self._agent_pos - self._goal_pos)
         reward = self.get_reward(prev_distance, new_distance, terminated)
         # reward -= 0.1  
-        if steps % 100 == 0:
-            print(f"DEBUG: After step - Agent pos: {self._agent_pos}, goal pos: {self._goal_pos}, distance: {new_distance}, reward: {reward}")
+        # if steps % 100 == 0:
+        #     print(f"DEBUG: After step - Agent pos: {self._agent_pos}, goal pos: {self._goal_pos}, distance: {new_distance}, reward: {reward}")
        
 
         return observation, reward, terminated, truncated, info
 
     def get_reward(self, prev_distance, new_distance, terminated):
         progress = (prev_distance - new_distance) 
-        reward = progress * 100.0
-        reward -= 0.05
+        reward = progress * 50.0
+        reward -= 0.01
         collided = self._check_collision(self._agent_pos, self.agent_radius)
         out_of_bounds = self._check_out_of_bounds(self._agent_pos, self.agent_radius)
         if collided or out_of_bounds:
-            reward -= 2.0  # collision penalty
+            reward -= 0.5  # collision penalty
         if terminated and new_distance < self.goal_radius:
-            reward += 100.0  # goal bonus
+            reward += 50.0  # goal bonus
 
         return reward
 
@@ -95,9 +98,9 @@ def make_env(
     world_width: float = 10.0,
     world_height: float = 10.0,
     agent_radius: float = 0.2,
-    goal_radius: float = 0.3,
-    max_velocity: float = 2.0,
-    max_episode_steps: int = 500,
+    goal_radius: float = 0.5,
+    max_velocity: float = 0.4,
+    max_episode_steps: int = 600,
     seed: Optional[int] = None,
     render_mode: Optional[str] = None,
 ) -> PointMassDiscreteEnv:
@@ -110,6 +113,7 @@ DEFAULT_ENV_ID = "PointMassDiscrete-v0"
 
 def register_pointmass_discrete_env(env_id: str = DEFAULT_ENV_ID, **kwargs) -> None:
     """Register the PointMassContinuousEnv with Gymnasium."""
+    # print("registering pointmass discrete env")
     gym_register(
         id=env_id,
         entry_point="cleanrl_utils.pointmass_discrete_env:PointMassDiscreteEnv",
