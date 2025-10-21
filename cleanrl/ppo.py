@@ -81,6 +81,8 @@ class Args:
     """the mini-batch size (computed in runtime)"""
     num_iterations: int = 0
     """the number of iterations (computed in runtime)"""
+    run_name: str = None
+    """custom run name for this experiment"""
 
 
 def make_env(env_id, idx, capture_video, run_name):
@@ -140,7 +142,7 @@ if __name__ == "__main__":
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+    run_name = args.run_name if args.run_name else f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
     if args.track:
         import wandb
 
@@ -241,6 +243,13 @@ if __name__ == "__main__":
                         )
                         writer.add_scalar(
                             "charts/episodic_length", info["episode"]["l"], global_step
+                        )
+                    
+                    if info and "actual_performance" in info:
+                        writer.add_scalar(
+                            "charts/actual_performance",
+                            info["actual_performance"],
+                            global_step,
                         )
 
         # bootstrap value if not done
