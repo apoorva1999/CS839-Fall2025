@@ -140,8 +140,9 @@ class PointMassContinuousEnv(gym.Env):
             closest_x = max(obs_x1, min(x, obs_x2))
             closest_y = max(obs_y1, min(y, obs_y2))
             distance = np.sqrt((x - closest_x) ** 2 + (y - closest_y) ** 2)
-
             if distance < radius:
+                # print(f"collision at step {self._steps}")
+                
                 return True
 
         return False
@@ -191,10 +192,9 @@ class PointMassContinuousEnv(gym.Env):
         truncated = False
 
         # Check for collisions and out of bounds
-        if self._check_out_of_bounds(new_pos, self.agent_radius):
+        if self._check_out_of_bounds(new_pos, self.agent_radius) or self._check_collision(new_pos, self.agent_radius):
             self._actual_performance -= 1
-        elif self._check_collision(new_pos, self.agent_radius):
-            self._actual_performance -= 1
+            # self._agent_pos += np.random.uniform(-0.05, 0.05, size=2)
         else:
             # Valid movement
             self._agent_pos = new_pos
@@ -293,7 +293,7 @@ def make_env(
     world_height: float = 10.0,
     agent_radius: float = 0.2,
     goal_radius: float = 0.3,
-    max_velocity: float = 2.0,
+    max_velocity: float = 0.4,
     max_episode_steps: int = 5000,
     seed: Optional[int] = None,
     render_mode: Optional[str] = None,
