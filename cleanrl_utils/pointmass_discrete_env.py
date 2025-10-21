@@ -45,8 +45,10 @@ class PointMassDiscreteEnv(PointMassContinuousEnv):
             8: (np.array([-self.max_velocity, -self.max_velocity]), "left-down"),  # Left-down
         }
 
-        # TODO: TURN DISCRETE ACTIONS INTO A CONTINUOUS ONE.
-        control = action_to_control[action][0] # placeholder logic
+        control = action_to_control[action][0]
+        if np.linalg.norm(control) != 0:
+            control = control / np.linalg.norm(control) * (self.max_velocity * 0.7)
+
 
 
         # Debug: Print before calling parent step
@@ -104,6 +106,7 @@ def make_env(
     seed: Optional[int] = None,
     render_mode: Optional[str] = None,
 ) -> PointMassDiscreteEnv:
+    # print("hello")
     return PointMassDiscreteEnv(seed=seed, render_mode=render_mode)
 
 
