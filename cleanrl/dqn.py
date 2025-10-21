@@ -15,10 +15,12 @@ from torch.utils.tensorboard import SummaryWriter
 
 from cleanrl_utils.buffers import ReplayBuffer
 
-from cleanrl_utils.pointmass_discrete_env import register_pointmass_discrete_env
+import cleanrl_utils.pointmass_discrete_env as pmd
+
+print("Loaded module from:", pmd.__file__)
 
 # Register and create environment
-register_pointmass_discrete_env()
+pmd.register_pointmass_discrete_env()
 
 
 @dataclass
@@ -144,6 +146,12 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
+    # Tracking variables for mean episodic return calculation
+    episodic_returns = []  # Store all episodic returns
+    episode_timesteps = []  # Store timesteps when episodes completed
+    window_size = 100  # Window size for rolling mean calculation
+    rolling_returns = []  # Store rolling mean returns
+
     # env setup
     envs = gym.vector.SyncVectorEnv(
         [
@@ -196,15 +204,41 @@ if __name__ == "__main__":
         if "final_info" in infos:
             for info in infos["final_info"]:
                 if info and "episode" in info:
+                    episodic_return = float(info["episode"]["r"])
+                    episode_length = int(info["episode"]["l"])
+                    
+                    # Store episodic return and timestep
+                    episodic_returns.append(episodic_return)
+                    episode_timesteps.append(global_step)
+                    
+                    # Calculate rolling mean of last window_size episodes
+                    if len(episodic_returns) >= window_size:
+                        recent_returns = episodic_returns[-window_size:]
+                        mean_return = np.mean(recent_returns)
+                        rolling_returns.append(mean_return)
+                    else:
+                        # If we don't have enough episodes yet, use all available
+                        mean_return = np.mean(episodic_returns)
+                        rolling_returns.append(mean_return)
+                    
                     print(
-                        f"global_step={global_step}, episodic_return={info['episode']['r']}"
+                        f"global_step={global_step}, episodic_return={episodic_return:.2f}, "
+                        f"mean_return_last_{min(window_size, len(episodic_returns))}={mean_return:.2f}"
+                    )
+                    
+                    # Log individual episodic return
+                    writer.add_scalar(
+                        "charts/episodic_return", episodic_return, global_step
                     )
                     writer.add_scalar(
-                        "charts/episodic_return", info["episode"]["r"], global_step
+                        "charts/episodic_length", episode_length, global_step
                     )
+                    
+                    # Log rolling mean episodic return
                     writer.add_scalar(
-                        "charts/episodic_length", info["episode"]["l"], global_step
+                        "charts/mean_episodic_return", mean_return, global_step
                     )
+                    
                 if info and "actual_performance" in info:
                     writer.add_scalar(
                         "charts/actual_performance",
@@ -263,6 +297,12 @@ if __name__ == "__main__":
                         + (1.0 - args.tau) * target_network_param.data
                     )
 
+        # Log mean episodic return every 1000 steps
+        if global_step % 1000 == 0 and len(episodic_returns) > 0:
+            recent_mean = np.mean(episodic_returns[-min(50, len(episodic_returns)):])
+            writer.add_scalar("charts/mean_episodic_return_recent", recent_mean, global_step)
+            print(f"Step {global_step}: Recent mean episodic return = {recent_mean:.2f}")
+
     if args.save_model:
         model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
         torch.save(q_network.state_dict(), model_path)
@@ -296,5 +336,26 @@ if __name__ == "__main__":
                 f"videos/{run_name}-eval",
             )
 
+    # Log final statistics
+    if len(episodic_returns) > 0:
+        final_mean_return = np.mean(episodic_returns)
+        final_std_return = np.std(episodic_returns)
+        final_max_return = np.max(episodic_returns)
+        final_min_return = np.min(episodic_returns)
+        
+        print(f"\n=== Final Statistics ===")
+        print(f"Total episodes completed: {len(episodic_returns)}")
+        print(f"Final mean episodic return: {final_mean_return:.2f} ± {final_std_return:.2f}")
+        print(f"Best episodic return: {final_max_return:.2f}")
+        print(f"Worst episodic return: {final_min_return:.2f}")
+        
+        # Log final statistics to tensorboard
+        writer.add_scalar("final/mean_episodic_return", final_mean_return, global_step)
+        writer.add_scalar("final/std_episodic_return", final_std_return, global_step)
+        writer.add_scalar("final/max_episodic_return", final_max_return, global_step)
+        writer.add_scalar("final/min_episodic_return", final_min_return, global_step)
+        writer.add_scalar("final/total_episodes", len(episodic_returns), global_step)
+
     envs.close()
     writer.close()
+
